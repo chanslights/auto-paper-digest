@@ -42,6 +42,8 @@ logger = get_logger()
 
 # EditThisCookie JSON export for NotebookLM
 NBLM_COOKIES_JSON = DATA_DIR / "profiles" / "chrome" / "Notebook_Cookies.json"
+# Playwright auth storage (created after successful headful login)
+NBLM_AUTH_STORAGE = DATA_DIR / "profiles" / "nblm_auth_storage.json"
 
 
 class NotebookLMBot:
@@ -106,9 +108,40 @@ class NotebookLMBot:
         self._context.set_default_timeout(PLAYWRIGHT_TIMEOUT)
         self._context.set_default_navigation_timeout(PLAYWRIGHT_NAVIGATION_TIMEOUT)
         
-        # Load cookies from EditThisCookie JSON export if available
-        if NBLM_COOKIES_JSON.exists():
-            logger.info(f"Loading NotebookLM cookies from {NBLM_COOKIES_JSON}")
+        # Check if profile already has authenticated cookies
+        # If yes, skip loading JSON cookies (they might conflict)
+        profile_has_auth = False
+        cookies_db = self.profile_path / "Default" / "Cookies"
+        if cookies_db.exists():
+            import sqlite3
+            try:
+                conn = sqlite3.connect(str(cookies_db))
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM cookies WHERE host_key LIKE '%google%' OR host_key LIKE '%notebooklm%'")
+                count = cursor.fetchone()[0]
+                profile_has_auth = count > 5  # Has meaningful cookies
+                conn.close()
+            except:
+                pass
+        
+        # Check for Playwright auth storage (created after successful headful login)
+        # Only use storage_state in headless mode; in headful mode, use persistent context
+        if NBLM_AUTH_STORAGE.exists() and self.headless:
+            logger.info(f"Using authenticated session from {NBLM_AUTH_STORAGE}")
+            # Close the persistent context and switch to storage_state
+            self._context.close()
+            self._context = self._playwright.chromium.launch(
+                headless=True,
+            ).new_context(storage_state=str(NBLM_AUTH_STORAGE))
+            self._context.set_default_timeout(PLAYWRIGHT_TIMEOUT)
+            self._context.set_default_navigation_timeout(PLAYWRIGHT_NAVIGATION_TIMEOUT)
+            self._page = self._context.new_page()
+            logger.info("Browser started with saved auth session (headless)")
+            return
+        
+        # Only load JSON cookies as fallback (if profile has no auth)
+        if NBLM_COOKIES_JSON.exists() and not profile_has_auth:
+            logger.info(f"Loading NotebookLM cookies from {NBLM_COOKIES_JSON} (profile has no auth)")
             with open(NBLM_COOKIES_JSON, 'r') as f:
                 cookies_data = json.load(f)
             
@@ -129,7 +162,11 @@ class NotebookLMBot:
                     }])
                 except Exception:
                     pass  # Skip problematic cookies
-            logger.info("NotebookLM cookies loaded")
+            logger.info("NotebookLM cookies loaded from JSON")
+        elif profile_has_auth:
+            logger.info("Using authenticated session from profile")
+        else:
+            logger.warning("No authenticated session found - may need to login")
         
         # Get or create main page
         if self._context.pages:
@@ -319,6 +356,16 @@ class NotebookLMBot:
                     
                     if ui_loaded:
                         logger.info("Login successful!")
+                        # Save the authenticated session for future headless runs
+                        try:
+                            auth_storage = self._context.storage_state()
+                            with open(NBLM_AUTH_STORAGE, 'w') as f:
+                                json.dump(auth_storage, f)
+                            logger.info(f"✅ Auth session saved to {NBLM_AUTH_STORAGE}")
+                            logger.info(f"   Cookies: {len(auth_storage.get('cookies', []))}")
+                            logger.info(f"   LocalStorage: {len(auth_storage.get('localStorage', []))}")
+                        except Exception as e:
+                            logger.warning(f"Failed to save auth session: {e}")
                         return True
                         
                 except PlaywrightTimeout:
