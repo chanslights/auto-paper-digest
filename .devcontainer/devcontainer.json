@@ -1,0 +1,23 @@
+{
+  "name": "Auto Paper Digest",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {}
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "forwardPorts": [5901],
+  "portsAttributes": {
+    "5901": {
+      "label": "VNC Server",
+      "onAutoForward": "openPreview"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-playwright.playwright"
+      ]
+    }
+  }
+}

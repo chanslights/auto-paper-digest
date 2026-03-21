@@ -207,12 +207,67 @@ auto-paper-digest/
 description = f"{paper.summary}\n\narXiv: {paper.paper_id}"
 ```
 
+## Cookies 备份与恢复
+
+Cookies 已备份到 `/root/.config/auto-paper-digest/cookies/`
+
+```bash
+# 备份
+/root/auto-paper-digest/.devcontainer/backup-cookies.sh backup
+
+# 恢复
+/root/auto-paper-digest/.devcontainer/backup-cookies.sh restore
+```
+
+**重要**：备份文件包含敏感信息，请妥善保管！
+
 ## 技术栈
 
 - **Playwright**: 浏览器自动化
 - **arXiv API**: 论文抓取
 - **NotebookLM**: AI 视频生成
 - **抖音创作者平台**: 视频发布
+
+## Coding Plan / 新服务器部署
+
+### 使用 devcontainer
+
+1. 在 Coding 中创建新项目，启用 DevOps → 代码托管
+2. 关联 GitHub 仓库
+3. 创建 Devbox（基于 devcontainer）
+4. devcontainer 会自动：
+   - 安装所有依赖
+   - 克隆项目
+   - 从备份恢复 cookies
+
+### 部署步骤
+
+```bash
+# 1. 克隆项目
+cd /root
+git clone https://github.com/chanslights/auto-paper-digest.git
+cd auto-paper-digest
+pip install -e .
+
+# 2. 恢复 cookies（如果之前有备份）
+/root/auto-paper-digest/.devcontainer/backup-cookies.sh restore
+
+# 3. 启动 VNC（如需要 headful 模式）
+vncserver :1 -geometry 1280x720 -depth 24
+
+# 4. 运行流水线
+DISPLAY=:1 python3 -m apd.cli run -w 2026-12
+```
+
+### Cookie 位置
+
+```
+/root/.config/auto-paper-digest/cookies/
+├── Cookies.json              # 抖音 EditThisCookie 格式
+├── nblm_auth_storage.json   # NotebookLM storage state
+├── default/                  # 抖音 Playwright profile
+└── nblm_auth/               # NotebookLM Playwright profile
+```
 
 ## 注意事项
 
