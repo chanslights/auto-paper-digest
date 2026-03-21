@@ -28,17 +28,19 @@ logger = get_logger()
 def download_pdf(
     paper_id: str,
     week_id: str,
-    force: bool = False
+    force: bool = False,
+    pdf_url: Optional[str] = None
 ) -> Optional[Path]:
     """
-    Download a PDF from arXiv.
+    Download a PDF from arXiv or PubMed Central.
     
     Implements idempotency: if PDF exists and SHA256 matches, skip unless force.
     
     Args:
-        paper_id: The arXiv paper ID
+        paper_id: The paper ID (arXiv ID or PMID)
         week_id: Week identifier for directory organization
         force: Force re-download even if file exists
+        pdf_url: Optional PDF URL (for PMC papers, overrides default arXiv URL)
         
     Returns:
         Path to the downloaded PDF, or None on failure
@@ -63,18 +65,28 @@ def download_pdf(
         # File exists but hash doesn't match - re-download
         logger.warning(f"PDF hash mismatch for {paper_id}, re-downloading")
     
-    # Build PDF URL
-    pdf_url = ARXIV_PDF_URL.format(paper_id=paper_id)
-    logger.info(f"Downloading PDF: {pdf_url}")
+    # Determine PDF URL
+    if pdf_url:
+        # PMC or other custom URL
+        download_url = pdf_url
+    elif paper and paper.pdf_url:
+        # Use URL from database (PMC or arXiv)
+        download_url = paper.pdf_url
+    else:
+        # Default to arXiv
+        download_url = ARXIV_PDF_URL.format(paper_id=paper_id)
+    
+    logger.info(f"Downloading PDF: {download_url}")
     
     headers = {"User-Agent": USER_AGENT}
     
     try:
         response = requests.get(
-            pdf_url,
+            download_url,
             headers=headers,
             timeout=REQUEST_TIMEOUT,
-            stream=True
+            stream=True,
+            allow_redirects=True
         )
         response.raise_for_status()
         
@@ -96,7 +108,7 @@ def download_pdf(
         upsert_paper(
             paper_id=paper_id,
             week_id=week_id,
-            pdf_url=pdf_url,
+            pdf_url=download_url,
             pdf_path=str(pdf_path),
             pdf_sha256=pdf_sha256,
             status=Status.PDF_OK,

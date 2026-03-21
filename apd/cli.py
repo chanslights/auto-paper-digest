@@ -119,6 +119,90 @@ def fetch(week: Optional[str], date: Optional[str], max_papers: int) -> None:
 
 
 # =============================================================================
+# Fetch Health Command
+# =============================================================================
+
+@main.command("fetch-health")
+@click.option(
+    "--week", "-w",
+    default=None,
+    help="Week ID (e.g., 2026-01). Used for organizing papers."
+)
+@click.option(
+    "--max", "-m",
+    "max_papers",
+    default=50,
+    type=int,
+    help="Maximum papers to fetch (default: 50)"
+)
+@click.option(
+    "--query", "-q",
+    default=None,
+    help="Custom PubMed search query. Uses default health query if not specified."
+)
+@click.option(
+    "--days", 
+    default=7,
+    type=int,
+    help="Search papers from the last N days (default: 7)"
+)
+def fetch_health(
+    week: Optional[str],
+    max_papers: int,
+    query: Optional[str],
+    days: int
+) -> None:
+    """
+    Fetch health/medical papers from PubMed.
+    
+    Searches PubMed for papers matching health/medical keywords
+    and stores them in the database. PDFs are downloaded from
+    PubMed Central (open access).
+    
+    Examples:
+        apd fetch-health                    # Fetch recent health papers
+        apd fetch-health --max 20          # Fetch max 20 papers
+        apd fetch-health --query "cancer"  # Search for cancer papers
+        apd fetch-health --days 14         # Search last 14 days
+    """
+    from .pubmed_fetcher import fetch_health_papers
+    
+    logger = get_logger()
+    week_id = week or get_current_week_id()
+    
+    try:
+        click.echo(f"🏥 Fetching health papers from PubMed...")
+        click.echo(f"   Week ID: {week_id}")
+        click.echo(f"   Max papers: {max_papers}")
+        click.echo(f"   Days back: {days}")
+        if query:
+            click.echo(f"   Query: {query}")
+        click.echo()
+        
+        papers = fetch_health_papers(
+            week_id=week_id,
+            max_papers=max_papers,
+            query=query,
+            days_back=days,
+        )
+        
+        click.echo(f"✅ Fetched {len(papers)} health papers")
+        
+        # Show stats
+        total = count_papers(week_id=week_id)
+        click.echo(f"   Total papers in database for {week_id}: {total}")
+        
+        # Show available papers with PDFs
+        pmc_count = sum(1 for p in papers if p.get("pdf_url"))
+        click.echo(f"   Papers with PMC PDF links: {pmc_count}")
+        
+    except Exception as e:
+        logger.exception("Fetch health failed")
+        click.echo(f"❌ Error: {e}", err=True)
+        sys.exit(1)
+
+
+# =============================================================================
 # Download Command
 # =============================================================================
 
