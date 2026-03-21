@@ -16,6 +16,8 @@ logger = get_logger()
 
 # Path to save/load Douyin authentication session
 DOUYIN_AUTH_PATH = DATA_DIR / ".douyin_auth.json"
+# Alternative: EditThisCookie export
+DOUYIN_COOKIES_JSON = DATA_DIR / "profiles" / "chrome" / "Cookies.json"
 CREATOR_HOME_URL = "https://creator.douyin.com/"
 UPLOAD_URL = "https://creator.douyin.com/creator-micro/content/upload"
 
@@ -46,12 +48,35 @@ class DouyinBot:
         # Grant geolocation permission to avoid the popup
         self.browser = self.playwright.chromium.launch(headless=self.headless)
         
-        # Load session if exists
-        if DOUYIN_AUTH_PATH.exists():
+        # Check for EditThisCookie JSON export first
+        if DOUYIN_COOKIES_JSON.exists():
+            logger.info(f"Loading Douyin cookies from {DOUYIN_COOKIES_JSON}")
+            with open(DOUYIN_COOKIES_JSON, 'r') as f:
+                cookies_data = json.load(f)
+            
+            self.context = self.browser.new_context(permissions=["geolocation"])
+            for c in cookies_data:
+                sameSite = c.get('sameSite', 'Lax')
+                if sameSite == 'unspecified' or not sameSite:
+                    sameSite = 'Lax'
+                try:
+                    self.context.add_cookies([{
+                        'name': c['name'],
+                        'value': c['value'],
+                        'domain': c['domain'],
+                        'path': c.get('path', '/'),
+                        'secure': c.get('secure', False),
+                        'httpOnly': c.get('httpOnly', False),
+                        'sameSite': sameSite,
+                        'expires': c.get('expirationDate') if c.get('expirationDate') else None,
+                    }])
+                except Exception:
+                    pass  # Skip problematic cookies
+        elif DOUYIN_AUTH_PATH.exists():
             logger.info(f"Loading Douyin session from {DOUYIN_AUTH_PATH}")
             self.context = self.browser.new_context(
                 storage_state=str(DOUYIN_AUTH_PATH),
-                permissions=["geolocation"],  # Auto-grant location permission
+                permissions=["geolocation"],
             )
         else:
             logger.info("No Douyin session found, starting fresh")
