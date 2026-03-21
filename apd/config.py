@@ -38,6 +38,7 @@ HF_PAPERS_DATE_PAGE_URL = "https://huggingface.co/papers/date/{date}"  # e.g., /
 HF_PAPERS_WEEK_URL = "https://huggingface.co/papers/week/{week}"  # e.g., /week/2026-W01
 
 # arXiv PDF download template
+ARXIV_API_URL = "https://export.arxiv.org/api/query"
 ARXIV_PDF_URL = "https://export.arxiv.org/pdf/{paper_id}.pdf"
 
 # NotebookLM

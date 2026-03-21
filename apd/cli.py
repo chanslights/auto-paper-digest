@@ -138,7 +138,7 @@ def fetch(week: Optional[str], date: Optional[str], max_papers: int) -> None:
 @click.option(
     "--query", "-q",
     default=None,
-    help="Custom PubMed search query. Uses default health query if not specified."
+    help="Custom search query (overrides default health keywords)."
 )
 @click.option(
     "--days", 
@@ -153,11 +153,11 @@ def fetch_health(
     days: int
 ) -> None:
     """
-    Fetch health/medical papers from PubMed.
+    Fetch health/medical papers from arXiv.
     
-    Searches PubMed for papers matching health/medical keywords
-    and stores them in the database. PDFs are downloaded from
-    PubMed Central (open access).
+    Searches arXiv for papers in health-related categories
+    (q-bio, cs.HC, cs.CY, etc.) with health-related keywords.
+    PDFs are downloaded from arXiv (same as original workflow).
     
     Examples:
         apd fetch-health                    # Fetch recent health papers
@@ -165,25 +165,25 @@ def fetch_health(
         apd fetch-health --query "cancer"  # Search for cancer papers
         apd fetch-health --days 14         # Search last 14 days
     """
-    from .pubmed_fetcher import fetch_health_papers
+    from .health_fetcher import fetch_health_papers as fetch_hp
     
     logger = get_logger()
     week_id = week or get_current_week_id()
     
     try:
-        click.echo(f"🏥 Fetching health papers from PubMed...")
+        click.echo(f"🏥 Fetching health papers from arXiv...")
         click.echo(f"   Week ID: {week_id}")
         click.echo(f"   Max papers: {max_papers}")
         click.echo(f"   Days back: {days}")
         if query:
-            click.echo(f"   Query: {query}")
+            click.echo(f"   Custom query: {query}")
         click.echo()
         
-        papers = fetch_health_papers(
+        papers = fetch_hp(
             week_id=week_id,
             max_papers=max_papers,
-            query=query,
             days_back=days,
+            keywords=[query] if query else None,
         )
         
         click.echo(f"✅ Fetched {len(papers)} health papers")
@@ -191,10 +191,6 @@ def fetch_health(
         # Show stats
         total = count_papers(week_id=week_id)
         click.echo(f"   Total papers in database for {week_id}: {total}")
-        
-        # Show available papers with PDFs
-        pmc_count = sum(1 for p in papers if p.get("pdf_url"))
-        click.echo(f"   Papers with PMC PDF links: {pmc_count}")
         
     except Exception as e:
         logger.exception("Fetch health failed")
