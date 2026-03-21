@@ -18,6 +18,8 @@ logger = get_logger()
 DOUYIN_AUTH_PATH = DATA_DIR / ".douyin_auth.json"
 # Alternative: EditThisCookie export
 DOUYIN_COOKIES_JSON = DATA_DIR / "profiles" / "chrome" / "Cookies.json"
+# Profile with authenticated session
+DOUYIN_PROFILE = DATA_DIR / "profiles" / "default"
 CREATOR_HOME_URL = "https://creator.douyin.com/"
 UPLOAD_URL = "https://creator.douyin.com/creator-micro/content/upload"
 
@@ -45,10 +47,24 @@ class DouyinBot:
         """Start the browser and context."""
         self.playwright = sync_playwright().start()
         
+        # Check for profile with authenticated session first
+        if DOUYIN_PROFILE.exists():
+            logger.info(f"Using Douyin profile from {DOUYIN_PROFILE}")
+            self.browser = self.playwright.chromium.launch_persistent_context(
+                user_data_dir=str(DOUYIN_PROFILE),
+                headless=self.headless,
+                permissions=["geolocation"],
+                accept_downloads=True,
+                args=["--no-sandbox"],
+            )
+            self.context = self.browser
+            self.page = self.context.new_page()
+            return
+        
         # Grant geolocation permission to avoid the popup
         self.browser = self.playwright.chromium.launch(headless=self.headless)
         
-        # Check for EditThisCookie JSON export first
+        # Check for EditThisCookie JSON export second
         if DOUYIN_COOKIES_JSON.exists():
             logger.info(f"Loading Douyin cookies from {DOUYIN_COOKIES_JSON}")
             with open(DOUYIN_COOKIES_JSON, 'r') as f:
@@ -200,9 +216,13 @@ class DouyinBot:
             tags: List of hashtags
             skip_login_check: Skip login verification (useful for batch publishing)
         """
-        if not skip_login_check and not self.is_logged_in():
-            logger.error("Not logged into Douyin. Run 'apd douyin-login' first.")
-            return False
+        if not skip_login_check:
+            try:
+                if not self.is_logged_in():
+                    logger.error("Not logged into Douyin. Run 'apd douyin-login' first.")
+                    return False
+            except Exception as e:
+                logger.warning(f"Login check failed: {e}, continuing anyway")
             
         logger.info(f"Navigating to upload page: {UPLOAD_URL}")
         self.page.goto(UPLOAD_URL)
