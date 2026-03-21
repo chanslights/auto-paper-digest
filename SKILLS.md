@@ -1,0 +1,222 @@
+# Auto Paper Digest - 抖音自动发布技能指南
+
+## 功能概述
+
+自动从 arXiv 抓取健康/医学论文，上传到 NotebookLM 生成视频 Overview，发布到抖音创作者平台。
+
+## 快速开始
+
+### 1. 安装依赖
+
+```bash
+# 安装系统依赖
+yum install -y mesa-libgbm alsa-lib
+
+# 安装 Python 依赖
+pip install playwright beautifulsoup4 lxml requests click python-dotenv
+playwright install chromium
+```
+
+### 2. 克隆项目
+
+```bash
+git clone https://github.com/chanslights/auto-paper-digest.git
+cd auto-paper-digest
+pip install -e .
+```
+
+### 3. 获取 Cookies（重要！）
+
+#### 3.1 NotebookLM Cookies
+
+1. 在本地 Chrome 登录 `notebooklm.google.com`
+2. 安装 **EditThisCookie** 扩展
+3. 导出 `notebooklm.google.com` 的 cookies 为 JSON
+4. 上传到服务器：`/root/clawd/auto-paper-digest/data/profiles/chrome/Notebook_Cookies.json`
+
+#### 3.2 抖音创作者 Cookies
+
+**方法一：EditThisCookie 导出**
+1. 在本地 Chrome 登录 `creator.douyin.com`
+2. 导出 `.douyin.com` 和 `.bytedance.com` 的 cookies
+3. 上传到服务器
+
+**方法二（推荐）：Playwright 捕获 Session**
+```bash
+# 在服务器上运行，VNC 打开浏览器
+vncserver :1 -geometry 1280x720 -depth 24
+
+# 用 Playwright 启动浏览器让用户登录
+cd /root/clawd/auto-paper-digest
+DISPLAY=:1 python3 << 'EOF'
+from playwright.sync_api import sync_playwright
+import json
+
+profile_path = 'data/profiles/default'
+
+with sync_playwright() as p:
+    context = p.chromium.launch_persistent_context(
+        user_data_dir=profile_path,
+        headless=False,
+        viewport={'width': 1280, 'height': 900},
+        args=['--no-sandbox']
+    )
+    
+    page = context.new_page()
+    page.goto('https://creator.douyin.com/', timeout=60000)
+    
+    # 用户扫码登录
+    import time
+    time.sleep(60)  # 等待用户登录
+    
+    # 保存 session
+    cookies = context.cookies()
+    with open('data/profiles/chrome/Cookies.json', 'w') as f:
+        json.dump(cookies, f)
+    
+    print(f'Saved {len(cookies)} cookies')
+    context.close()
+EOF
+```
+
+## 使用方法
+
+### 抓取健康论文
+
+```bash
+cd /root/clawd/auto-paper-digest
+python3 -m apd.cli fetch-health -w 2026-12 -m 5
+```
+
+### 上传并生成视频
+
+```bash
+# 上传到 NotebookLM 生成视频
+DISPLAY=:1 python3 -m apd.cli nblm -w 2026-12 --headful
+
+# 或者用保存的 session（headless 模式）
+python3 -m apd.cli nblm -w 2026-12
+```
+
+### 添加自定义 Prompt
+
+```bash
+# 中文 prompt，生成适合普通观众的视频
+DISPLAY=:1 python3 -m apd.cli nblm -w 2026-12 --prompt "用简单的语言解释，适合普通观众，重点介绍实际应用"
+```
+
+### 下载视频
+
+```bash
+DISPLAY=:1 python3 -m apd.cli download-video -w 2026-12 --force
+```
+
+### 发布到抖音
+
+```bash
+# 确保 DISPLAY 可用
+DISPLAY=:1 python3 -m apd.cli publish-douyin -w 2026-12 --headful
+
+# 或者直接用（如果 session 有效）
+DISPLAY=:1 python3 -m apd.cli publish-douyin -w 2026-12
+```
+
+### 一键运行完整流程
+
+```bash
+DISPLAY=:1 python3 -m apd.cli run -w 2026-12 -m 3 --headful
+```
+
+## 常见问题
+
+### Q: 提示"需要登录"怎么办？
+
+Session 过期了。需要重新获取 cookies：
+
+**抖音：**
+```bash
+# 重新登录
+rm -f data/profiles/default/SingletonLock
+DISPLAY=:1 python3 << 'EOF'
+from playwright.sync_api import sync_playwright
+import json
+
+profile_path = 'data/profiles/default'
+
+with sync_playwright() as p:
+    context = p.chromium.launch_persistent_context(
+        user_data_dir=profile_path,
+        headless=False,
+        viewport={'width': 1280, 'height': 900},
+        args=['--no-sandbox']
+    )
+    page = context.new_page()
+    page.goto('https://creator.douyin.com/', timeout=60000)
+    import time
+    time.sleep(120)  # 等用户扫码登录
+    cookies = context.cookies()
+    with open('data/profiles/chrome/Cookies.json', 'w') as f:
+        json.dump(cookies, f)
+    context.close()
+EOF
+```
+
+### Q: Session 能维持多久？
+
+- 抖音 session：通常 2-4 周
+- NotebookLM session：通常 1-2 周
+- 检测到异常可能提前过期
+
+### Q: 如何设置定时任务？
+
+```bash
+# 编辑 crontab
+crontab -e
+
+# 每天早上 9 点运行
+0 9 * * * cd /root/clawd/auto-paper-digest && DISPLAY=:1 python3 -m apd.cli run -w $(date +\%G-\%V) >> logs/cron.log 2>&1
+```
+
+## 目录结构
+
+```
+auto-paper-digest/
+├── data/
+│   ├── profiles/
+│   │   ├── chrome/
+│   │   │   └── Cookies.json          # EditThisCookie 导出的 cookies
+│   │   ├── default/                  # Playwright Chromium profile（包含抖音 session）
+│   │   └── nblm_auth/               # NotebookLM profile
+│   ├── pdfs/weekly/                 # 下载的 PDF
+│   ├── videos/weekly/               # 生成的视频
+│   └── apd.db                       # SQLite 数据库
+├── apd/
+│   ├── health_fetcher.py            # arXiv 健康论文抓取
+│   ├── nblm_bot.py                 # NotebookLM 自动化
+│   ├── douyin_bot.py               # 抖音发布自动化
+│   └── cli.py                      # 命令行工具
+└── SKILLS.md                       # 本文件
+```
+
+## 视频描述模板
+
+发布时使用的描述模板可在 `apd/cli.py` 中修改：
+
+```python
+# 默认模板
+description = f"{paper.summary}\n\narXiv: {paper.paper_id}"
+```
+
+## 技术栈
+
+- **Playwright**: 浏览器自动化
+- **arXiv API**: 论文抓取
+- **NotebookLM**: AI 视频生成
+- **抖音创作者平台**: 视频发布
+
+## 注意事项
+
+1. 抖音和 NotebookLM 的 cookies 必须分别获取
+2. 使用 VNC 时确保 DISPLAY 环境变量正确
+3. 视频生成需要 5-10 分钟，耐心等待
+4. 定期检查 cookies 有效性
