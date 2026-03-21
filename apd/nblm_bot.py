@@ -2,13 +2,14 @@
 NotebookLM browser automation module.
 
 Uses Playwright with persistent context to automate:
-- Google login (first run, headful)
+- Google login (first run, headful) OR cookie import
 - Notebook creation
 - PDF upload and ingestion
 - Video Overview generation
 - Video download
 """
 
+import json
 import time
 from pathlib import Path
 from typing import Optional
@@ -23,6 +24,7 @@ from playwright.sync_api import (
 )
 
 from .config import (
+    DATA_DIR,
     DEFAULT_PROFILE,
     NOTEBOOKLM_URL,
     PLAYWRIGHT_NAVIGATION_TIMEOUT,
@@ -37,6 +39,9 @@ from .db import get_paper, update_status, upsert_paper
 from .utils import ensure_dir, get_logger, get_period_subdir, sanitize_filename
 
 logger = get_logger()
+
+# EditThisCookie JSON export for NotebookLM
+NBLM_COOKIES_JSON = DATA_DIR / "profiles" / "chrome" / "Notebook_Cookies.json"
 
 
 class NotebookLMBot:
@@ -100,6 +105,31 @@ class NotebookLMBot:
         # Set default timeouts
         self._context.set_default_timeout(PLAYWRIGHT_TIMEOUT)
         self._context.set_default_navigation_timeout(PLAYWRIGHT_NAVIGATION_TIMEOUT)
+        
+        # Load cookies from EditThisCookie JSON export if available
+        if NBLM_COOKIES_JSON.exists():
+            logger.info(f"Loading NotebookLM cookies from {NBLM_COOKIES_JSON}")
+            with open(NBLM_COOKIES_JSON, 'r') as f:
+                cookies_data = json.load(f)
+            
+            for c in cookies_data:
+                sameSite = c.get('sameSite', 'Lax')
+                if sameSite == 'unspecified' or not sameSite:
+                    sameSite = 'Lax'
+                try:
+                    self._context.add_cookies([{
+                        'name': c['name'],
+                        'value': c['value'],
+                        'domain': c['domain'],
+                        'path': c.get('path', '/'),
+                        'secure': c.get('secure', False),
+                        'httpOnly': c.get('httpOnly', False),
+                        'sameSite': sameSite,
+                        'expires': c.get('expirationDate') if c.get('expirationDate') else None,
+                    }])
+                except Exception:
+                    pass  # Skip problematic cookies
+            logger.info("NotebookLM cookies loaded")
         
         # Get or create main page
         if self._context.pages:
