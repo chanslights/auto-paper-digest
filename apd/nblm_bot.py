@@ -600,7 +600,75 @@ class NotebookLMBot:
         logger.warning("Ingestion wait timeout")
         self.take_screenshot("ingestion_timeout")
         return False
-    
+
+    def send_chat_message(self, message: str, wait_response: bool = True) -> bool:
+        """
+        Send a message to the NotebookLM chat.
+
+        Args:
+            message: The message to send
+            wait_response: Wait for response to appear
+
+        Returns:
+            True if message was sent successfully
+        """
+        logger.info(f"Sending chat message: {message[:50]}...")
+        try:
+            time.sleep(2)  # Let chat input render
+
+            # Try various selectors for the chat input
+            chat_input = None
+            for selector in [
+                'textarea[placeholder*="开始输入"]',
+                'textarea[placeholder*="Ask anything"]',
+                'textarea[placeholder*="开始"]',
+                'textarea[placeholder*="输入"]',
+                '[role="textbox"][aria-label*="输入"]',
+                '[contenteditable="true"]',
+                'div[data-placeholder*="开始"]',
+                'textarea',
+            ]:
+                try:
+                    inp = self.page.locator(selector).first
+                    if inp.count() > 0 and inp.is_visible():
+                        chat_input = inp
+                        logger.debug(f"Found chat input with selector: {selector}")
+                        break
+                except Exception:
+                    pass
+
+            if not chat_input:
+                logger.warning("Could not find chat input field")
+                self.take_screenshot("chat_input_not_found")
+                return False
+
+            chat_input.click()
+            time.sleep(1)
+            chat_input.fill(message)
+            time.sleep(1)
+
+            # Press Enter to send
+            self.page.keyboard.press("Enter")
+            logger.info("Chat message sent")
+
+            if wait_response:
+                # Wait for response to appear (chat generates a response)
+                time.sleep(5)
+                # Check if a response appeared
+                try:
+                    responses = self.page.locator('[class*="response"], [class*="message"]:not([class*="user"])').all()
+                    if len(responses) > 0:
+                        logger.info(f"Chat response received ({len(responses)} messages)")
+                except Exception:
+                    pass
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to send chat message: {e}")
+            self.take_screenshot("chat_send_failed")
+            return False
+
     def extract_summary(self) -> Optional[str]:
         """
         Extract the auto-generated summary from the chat/dialogue area.
@@ -1366,7 +1434,16 @@ class NotebookLMBot:
             if not self.navigate_to_studio():
                 update_status(paper_id, Status.ERROR, "Failed to navigate to Studio")
                 return False
-            
+
+            # Instruct chat to generate Chinese video before generating
+            chinese_instruction = (
+                "请用中文普通话生成视频概览，语音要专业温和，总时长控制在3分钟以内。"
+                "重点讲清楚论文最核心的1-2个发现，用通俗易懂的语言，让普通观众也能理解。"
+                "结构：开头用生活问题引入（15秒），核心内容讲清研究发现（2分钟），结尾给健康建议（15秒）。"
+            )
+            self.send_chat_message(chinese_instruction, wait_response=True)
+            time.sleep(3)  # Extra wait for chat processing
+
             # Generate video
             if not self.generate_video_overview(steering_prompt):
                 update_status(paper_id, Status.ERROR, "Failed to start video generation")
