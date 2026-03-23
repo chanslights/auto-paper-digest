@@ -1527,7 +1527,13 @@ class NotebookLMBot:
             if not self.wait_for_video_ready(timeout=int(PLAYWRIGHT_VIDEO_TIMEOUT / 1000)):
                 update_status(paper_id, Status.ERROR, "Video generation timeout")
                 return False
-            
+
+            # Generate slides BEFORE downloading video (still on Studio panel)
+            if slides_prompt_file:
+                logger.info(f"Generating slides with prompt file: {slides_prompt_file}")
+                self.generate_slides_from_prompt_file(slides_prompt_file)
+                # Note: slides generation happens in background, don't wait for completion
+
             # Download video
             video_dir = ensure_dir(VIDEO_DIR / get_period_subdir(week_id))
             
@@ -1543,13 +1549,7 @@ class NotebookLMBot:
                 video_path=str(result),
                 status=Status.VIDEO_OK
             )
-            
-            # Generate slides with prompt file if specified
-            if slides_prompt_file:
-                logger.info(f"Generating slides with prompt file: {slides_prompt_file}")
-                self.generate_slides_from_prompt_file(slides_prompt_file)
-                # Note: slides generation happens in background, don't wait for completion
-            
+
             logger.info(f"Successfully processed paper: {paper_id}")
             return True
             
