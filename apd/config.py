@@ -82,7 +82,7 @@ DOWNLOAD_DELAY_SECONDS = 3
 # Playwright timeouts (milliseconds)
 PLAYWRIGHT_TIMEOUT = 60000  # 60 seconds for general operations
 PLAYWRIGHT_NAVIGATION_TIMEOUT = 120000  # 120 seconds for page navigation
-PLAYWRIGHT_VIDEO_TIMEOUT = 600000  # 10 minutes for video generation
+PLAYWRIGHT_VIDEO_TIMEOUT = 900000  # 15 minutes for video generation
 
 # User agent for requests
 USER_AGENT = (

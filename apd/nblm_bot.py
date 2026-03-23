@@ -1355,7 +1355,7 @@ class NotebookLMBot:
                 return False
             
             # Wait for video
-            if not self.wait_for_video_ready():
+            if not self.wait_for_video_ready(timeout=int(PLAYWRIGHT_VIDEO_TIMEOUT / 1000)):
                 update_status(paper_id, Status.ERROR, "Video generation timeout")
                 return False
             
