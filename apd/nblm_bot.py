@@ -744,14 +744,32 @@ class NotebookLMBot:
                     logger.info("Clicked on 视频概览 card")
                     
                     # Check if a dialog appeared asking for customization
-                    # If so, click the generate button
+                    # If so, fill in steering prompt then click generate
                     try:
+                        time.sleep(2)  # Wait for dialog to fully render
+                        # Look for textarea in the dialog (NotebookLM has an optional prompt field)
+                        if steering_prompt:
+                            for selector in [
+                                'textarea[placeholder*="提示"], textarea[placeholder*="prompt"], textarea[placeholder*="Add instruction"]',
+                                '[role="dialog"] textarea',
+                                'textarea[id*="prompt"], textarea[id*="instruction"]',
+                            ]:
+                                try:
+                                    ta = self.page.locator(selector).first
+                                    if ta.count() > 0 and ta.is_visible():
+                                        ta.fill(steering_prompt)
+                                        logger.info(f"Filled steering prompt ({len(steering_prompt)} chars)")
+                                        time.sleep(1)
+                                        break
+                                except Exception:
+                                    pass
+                        
                         generate_btn = self.page.get_by_role("button", name="生成")
                         if generate_btn.count() > 0 and generate_btn.first.is_visible():
                             generate_btn.first.click()
                             logger.info("Clicked 生成 button in dialog")
-                    except Exception:
-                        pass  # No dialog, generation started directly
+                    except Exception as e:
+                        logger.debug(f"Dialog handling: {e}")
                     
                     logger.info("Video Overview generation started")
                     return True
