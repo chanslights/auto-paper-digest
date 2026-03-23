@@ -17,12 +17,19 @@ echo "║  请选择要执行的步骤:                                         
 echo "║                                                              ║"
 echo "║  [1] 下载论文 + 生成视频 (fetch + download + upload)         ║"
 echo "║  [2] 下载视频 + 发布抖音 (download-video + publish-douyin)   ║"
+echo "║  [3] 清理 NotebookLM 笔记簿 (clean-nblm)                    ║"
 echo "║                                                              ║"
 echo "║  [0] 退出                                                    ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
 
-read -p "请输入步骤编号 (0-2): " choice
+# 支持命令行参数，用于非交互式执行（如 crontab）
+if [ -n "$1" ]; then
+    choice=$1
+    echo "自动执行模式，选择: $choice"
+else
+    read -p "请输入步骤编号 (0-3): " choice
+fi
 
 case $choice in
     1)
@@ -59,6 +66,18 @@ case $choice in
         echo ""
         echo "🎉 全部完成！"
         ;;
+    3)
+        echo ""
+        echo "=========================================="
+        echo "🗑️  步骤 3: 清理 NotebookLM 笔记簿"
+        echo "=========================================="
+        echo ""
+        echo "正在执行: apd clean-nblm --headful --yes"
+        echo ""
+        apd clean-nblm --headful --yes
+        echo ""
+        echo "✅ 清理完成！"
+        ;;
     0)
         echo "👋 再见!"
         exit 0
@@ -68,3 +87,4 @@ case $choice in
         exit 1
         ;;
 esac
+
