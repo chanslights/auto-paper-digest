@@ -875,13 +875,16 @@ class NotebookLMBot:
             self.take_screenshot("generate_failed")
             return False
     
-    def generate_slides(self) -> bool:
+    def generate_slides(self, steering_prompt: Optional[str] = None) -> bool:
         """
         Generate a PDF presentation (slides).
         
         In the new NotebookLM UI, clicking the "演示文稿" (Slides/Presentation) card
         directly triggers generation.
         
+        Args:
+            steering_prompt: Optional prompt to guide the slides content and style
+            
         Returns:
             True if generation started successfully
         """
@@ -900,6 +903,24 @@ class NotebookLMBot:
                     logger.info("Clicked on 演示文稿 card")
                     
                     # Check if a dialog appeared asking for customization
+                    # Fill in steering prompt if available
+                    if steering_prompt:
+                        time.sleep(2)  # Wait for dialog to fully render
+                        for selector in [
+                            'textarea[placeholder*="提示"], textarea[placeholder*="prompt"], textarea[placeholder*="Add instruction"]',
+                            '[role="dialog"] textarea',
+                            'textarea[id*="prompt"], textarea[id*="instruction"]',
+                        ]:
+                            try:
+                                ta = self.page.locator(selector).first
+                                if ta.count() > 0 and ta.is_visible():
+                                    ta.fill(steering_prompt)
+                                    logger.info(f"Filled slides prompt ({len(steering_prompt)} chars)")
+                                    time.sleep(1)
+                                    break
+                            except Exception:
+                                pass
+                    
                     try:
                         generate_btn = self.page.get_by_role("button", name="生成")
                         if generate_btn.count() > 0 and generate_btn.first.is_visible():
@@ -943,6 +964,25 @@ class NotebookLMBot:
             logger.error(f"Failed to start slides generation: {e}")
             self.take_screenshot("slides_generate_failed")
             return False
+
+    def generate_slides_from_prompt_file(self, filename: str = "mental_health_slides.txt") -> bool:
+        """
+        Read a slides prompt from file and generate slides with it.
+
+        Args:
+            filename: Prompt file name in data/prompts/ directory.
+                      e.g. "mental_health_slides.txt", "general_health_slides.txt"
+
+        Returns:
+            True if slides generation started
+        """
+        from .config import read_prompt_file
+        prompt = read_prompt_file(filename)
+        if not prompt:
+            logger.warning(f"Prompt file '{filename}' not found or empty, generating without prompt")
+        else:
+            logger.info(f"Loaded slides prompt from '{filename}' ({len(prompt)} chars)")
+        return self.generate_slides(steering_prompt=prompt if prompt else None)
     
     def rename_notebook(self, new_name: str) -> bool:
         """

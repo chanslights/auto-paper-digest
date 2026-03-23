@@ -48,6 +48,28 @@ NOTEBOOKLM_URL = "https://notebooklm.google.com"
 # NotebookLM Steering Prompts
 # =============================================================================
 
+NOTEBOOKLM_PROMPT_SLIDES_MENTAL_HEALTH = """请用中文制作演示文稿（Slides），风格要求：1. 每页布局简洁清晰，重点突出；2. 使用通俗易懂的语言，避免专业术语；3. 总共8-12页；4. 结构：封面（标题+作者）、研究背景（1页）、核心发现（3-5页）、结论与建议（2页）、参考文献。"""
+
+# =============================================================================
+# Prompt File Reader
+# =============================================================================
+
+def read_prompt_file(filename: str) -> str:
+    """
+    Read a prompt from a file in the prompts directory.
+    
+    Args:
+        filename: e.g. "mental_health_slides.txt"
+        
+    Returns:
+        The prompt content, or empty string if file not found
+    """
+    path = PROFILE_DIR.parent / "prompts" / filename
+    if path.exists():
+        return path.read_text().strip()
+    return ""
+
+
 NOTEBOOKLM_PROMPT_MENTAL_HEALTH = """请用中文普通话生成视频内容。语音：专业温和的医生风格。内容：极度简洁，保留论文最核心的1-2个发现，用通俗语言解释，不涉及专业术语。结构：开头吸引注意（15秒），核心讲清发现（2分钟），结尾给健康建议（15秒）。总时长3分钟以内。"""
 
 # =============================================================================
