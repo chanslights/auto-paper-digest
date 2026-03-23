@@ -305,22 +305,32 @@ def download(
     default=None,
     help="Steering prompt for video generation"
 )
+@click.option(
+    "--slides-prompt",
+    "slides_prompt_file",
+    default=None,
+    help="Prompt file name in data/prompts/ for slides. e.g. tcm_slides.txt, mental_health_slides.txt"
+)
 def nblm(
     week: Optional[str],
     paper_id: Optional[str],
     headful: bool,
     force: bool,
     max_papers: Optional[int],
-    prompt: Optional[str]
+    prompt: Optional[str],
+    slides_prompt_file: Optional[str]
 ) -> None:
     """
     Process papers through NotebookLM.
     
-    Creates notebooks, uploads PDFs, generates Audio Overview videos,
+    Creates notebooks, uploads PDFs, generates Audio Overview videos and slides,
     and downloads them locally.
     
     First-time usage requires --headful for manual Google login.
     Subsequent runs can be headless (the session is persisted).
+    
+    Use --slides-prompt to generate Chinese slides. Example:
+      apd nblm --paper-id 10.59565_001c.81914 --slides-prompt tcm_slides.txt
     """
     from pathlib import Path
     from .nblm_bot import NotebookLMBot, process_papers_for_week
@@ -348,6 +358,7 @@ def nblm(
                     pdf_path=Path(paper.pdf_path),
                     week_id=paper.week_id,
                     steering_prompt=prompt,
+                    slides_prompt_file=slides_prompt_file,
                     force=force
                 )
             
@@ -374,7 +385,8 @@ def nblm(
                 headless=headless,
                 max_papers=max_papers,
                 force=force,
-                steering_prompt=prompt
+                steering_prompt=prompt,
+                slides_prompt_file=slides_prompt_file
             )
             
             click.echo(f"✅ Processing complete: {success} success, {failure} failed")

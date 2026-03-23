@@ -1417,16 +1417,19 @@ class NotebookLMBot:
         pdf_path: Path,
         week_id: str,
         steering_prompt: Optional[str] = None,
+        slides_prompt_file: Optional[str] = None,
         force: bool = False
     ) -> bool:
         """
-        Full pipeline: create notebook, upload PDF, generate video, download.
+        Full pipeline: create notebook, upload PDF, generate video and slides, download.
         
         Args:
             paper_id: The paper ID
             pdf_path: Path to the PDF file
             week_id: Week identifier
             steering_prompt: Optional steering prompt for video
+            slides_prompt_file: Optional prompt file name in data/prompts/ for slides.
+                                e.g. "tcm_slides.txt", "mental_health_slides.txt"
             force: Force reprocessing even if already done
             
         Returns:
@@ -1509,6 +1512,12 @@ class NotebookLMBot:
                 video_path=str(result),
                 status=Status.VIDEO_OK
             )
+            
+            # Generate slides with prompt file if specified
+            if slides_prompt_file:
+                logger.info(f"Generating slides with prompt file: {slides_prompt_file}")
+                self.generate_slides_from_prompt_file(slides_prompt_file)
+                # Note: slides generation happens in background, don't wait for completion
             
             logger.info(f"Successfully processed paper: {paper_id}")
             return True
@@ -1719,7 +1728,8 @@ def process_papers_for_week(
     headless: bool = True,
     max_papers: Optional[int] = None,
     force: bool = False,
-    steering_prompt: Optional[str] = None
+    steering_prompt: Optional[str] = None,
+    slides_prompt_file: Optional[str] = None
 ) -> tuple[int, int]:
     """
     Process all papers for a week through NotebookLM.
@@ -1730,6 +1740,7 @@ def process_papers_for_week(
         max_papers: Maximum papers to process
         force: Force reprocessing
         steering_prompt: Optional steering prompt for videos
+        slides_prompt_file: Optional prompt file name in data/prompts/ for slides
         
     Returns:
         Tuple of (success_count, failure_count)
@@ -1766,6 +1777,7 @@ def process_papers_for_week(
                 pdf_path=pdf_path,
                 week_id=week_id,
                 steering_prompt=steering_prompt,
+                slides_prompt_file=slides_prompt_file,
                 force=force
             )
             
