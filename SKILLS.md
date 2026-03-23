@@ -105,6 +105,32 @@ python3 -m apd.cli nblm -w 2026-12
 DISPLAY=:1 python3 -m apd.cli nblm -w 2026-12 --prompt "用简单的语言解释，适合普通观众，重点介绍实际应用"
 ```
 
+### 医生科普 Prompt（用于健康/心理类视频）
+
+代码中已内置 `NOTEBOOKLM_PROMPT_MENTAL_HEALTH` 常量（位于 `apd/config.py`）。
+
+```bash
+# 方式一：使用内置常量（需要 python 引用）
+DISPLAY=:1 python3 -c "
+from apd.config import NOTEBOOKLM_PROMPT_MENTAL_HEALTH
+import subprocess
+subprocess.run(['python3', '-m', 'apd.cli', 'nblm', '-w', '2026-13', '--paper-id', '<论文ID>', '--prompt', NOTEBOOKLM_PROMPT_MENTAL_HEALTH])
+"
+
+# 方式二：直接粘贴 prompt
+DISPLAY=:1 python3 -m apd.cli nblm -w 2026-13 --paper-id <论文ID> \
+  --prompt '你是一位专业的临床医生/医学科普专家，需要为普通大众讲解一篇健康/医疗类学术论文的核心内容。要求：
+1. 语音：使用标准普通话，语气专业、温和，符合医生科普的语速（每分钟200字左右），避免生硬机械；
+2. 内容：极度简洁，仅保留论文最核心的1-2个结论/发现，剔除专业术语（或用通俗语言解释），总时长控制在60秒内；
+3. 风格：纯科普导向，聚焦「普通人能理解、能应用」的知识点，不涉及复杂实验/数据细节；
+4. 结构：
+   - 开头（10秒）：用生活化的问题引入（如「你知道XX疾病的最新预防方法吗？」）；
+   - 核心（40秒）：用1-2句话讲清论文的核心发现（通俗化）；
+   - 结尾（10秒）：给出简单的健康建议（如「日常做到XX就能降低风险」）。'
+```
+
+**注意：** 使用 `--paper-id` 指定单篇论文，以免覆盖其他已生成的视频。
+
 ### 下载视频
 
 ```bash
