@@ -893,12 +893,28 @@ class NotebookLMBot:
         try:
             # Wait for page to stabilize
             time.sleep(2)
-            
+
+            # Scroll down to make the Studio panel cards visible
+            try:
+                studio_area = self.page.locator('[class*="studio"], [class*="right"], [class*="panel"]').first
+                if studio_area.count() > 0 and studio_area.is_visible():
+                    studio_area.evaluate("el => el.scrollIntoView({block: 'center'})")
+                    time.sleep(2)
+            except Exception:
+                pass
+
             # Method 1: Click on the "演示文稿" (Slides) card
             try:
                 slides_card = self.page.get_by_text("演示文稿", exact=True)
-                if slides_card.count() > 0 and slides_card.first.is_visible():
-                    slides_card.first.click()
+                if slides_card.count() > 0:
+                    # Scroll the card into view
+                    try:
+                        slides_card.first.scroll_into_view_if_needed()
+                        time.sleep(1)
+                    except Exception:
+                        pass
+                    if slides_card.first.is_visible():
+                        slides_card.first.click()
                     time.sleep(1)
                     logger.info("Clicked on 演示文稿 card")
                     
@@ -982,6 +998,21 @@ class NotebookLMBot:
             logger.warning(f"Prompt file '{filename}' not found or empty, generating without prompt")
         else:
             logger.info(f"Loaded slides prompt from '{filename}' ({len(prompt)} chars)")
+
+        # Wait for Studio panel to be visible (notebook content loaded)
+        logger.info("Waiting for Studio panel to load...")
+        for attempt in range(10):  # up to 30s
+            try:
+                studio = self.page.locator('[class*="studio"], [class*="right"], [class*="panel"]').first
+                if studio.count() > 0 and studio.is_visible():
+                    logger.info("Studio panel visible")
+                    break
+            except Exception:
+                pass
+            time.sleep(3)
+        else:
+            logger.warning("Studio panel did not appear, proceeding anyway")
+
         return self.generate_slides(steering_prompt=prompt if prompt else None)
     
     def rename_notebook(self, new_name: str) -> bool:
